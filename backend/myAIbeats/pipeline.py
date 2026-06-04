@@ -130,20 +130,28 @@ def run(
         vocal_path = None
         vocal_gate = None
         lyric = spec.vocals.lyrics.get(section.id, "")
+        # stitch_path is what gets crossfaded into the master. It starts as
+        # the instrumental and is replaced by a vocal-mixed version only when
+        # a vocal passes its (non-blocking) gate.
+        stitch_path = out.audio_path
+
         if spec.vocals.enabled and lyric:
             em.step_start("vocal_synth", section=section.id)
             v_out = renderer.vocal(section, lyric, spec)
             vocal_gate = V.vocal_verify(section.id, v_out.audio_path, v_out.duration_s)
             if vocal_gate.passed:
-                em.gate_pass("vocal_verify", section=section.id, **vocal_gate.metrics)
+                em.gate_pass("vocal_verify", **vocal_gate.metrics)
                 vocal_path = v_out.audio_path
+                # mix the vocal onto the instrumental for this section
+                mixed = out.audio_path.replace(".wav", "_mixed.wav")
+                stitch_path = renderer.mix_vocal(out.audio_path, vocal_path, mixed)
             else:
                 em.skip("vocal_verify", section=section.id, detail=vocal_gate.detail)
             em.step_complete("vocal_synth", section=section.id)
 
         sr = SectionResult(
             section_id=section.id,
-            audio_path=out.audio_path,
+            audio_path=stitch_path,        # vocal-mixed if a vocal landed, else instrumental
             duration_s=out.duration_s,
             clap_score=out.clap_score,
             used_continuation=out.used_continuation,
@@ -155,8 +163,8 @@ def run(
         )
         manifest.sections.append(sr)
 
-        # thread the continuation: even tone pads become the "prev" audio
-        # so the next section has something to continue from
+        # thread the continuation from the INSTRUMENTAL (out.audio_path),
+        # never the vocal-mixed version — keeps musical continuity clean.
         prev_audio = out.audio_path
 
     # ---- stitch + verify -------------------------------------------------

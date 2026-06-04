@@ -56,6 +56,17 @@ class BeatRenderer(Protocol):
         spec: SongSpec,
     ) -> VocalOut: ...
 
+    def mix_vocal(
+        self,
+        instrumental_path: str,
+        vocal_path: str,
+        out_path: str,
+    ) -> str:
+        """Overlay a vocal onto an instrumental section. Returns the mixed
+        audio path (used for stitching). Continuation always threads from
+        the instrumental, never the vocal-mixed version."""
+        ...
+
 
 # ---- offline fake -------------------------------------------------------
 
@@ -106,3 +117,8 @@ class ScriptedRenderer:
             audio_path=f"/tmp/myAIbeats/{section.id}_vocal.wav",
             duration_s=max(1.0, len(lyric.split()) * 0.4),
         )
+
+    def mix_vocal(self, instrumental_path: str, vocal_path: str,
+                  out_path: str) -> str:
+        # offline: no real mixing — the mixed section is just the instrumental
+        return instrumental_path

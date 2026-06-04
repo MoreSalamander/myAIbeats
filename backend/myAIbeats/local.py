@@ -222,6 +222,45 @@ class CLAPScorer:
             return 0.0
 
 
+# ---- Bark vocal synthesizer ---------------------------------------------
+
+class BarkVocal:
+    """suno/bark-small — rough sung vocals from text. Non-blocking by design;
+    the song never depends on it. bark-small (~2GB) fits 24GB comfortably;
+    upgrade to suno/bark for higher fidelity."""
+
+    def __init__(self, model_id: str = "suno/bark-small", device: str = "cpu"):
+        # Bark has unresolved MPS allocation bugs ("Placeholder storage has
+        # not been allocated on MPS device") — CPU is the reliable path.
+        # bark-small on CPU runs in well under a minute per line.
+        self.model_id = model_id
+        self.device   = device
+        self._model = None
+        self._proc  = None
+
+    def _ensure(self):
+        if self._model is None:
+            from transformers import AutoProcessor, BarkModel
+            self._proc  = AutoProcessor.from_pretrained(self.model_id)
+            self._model = BarkModel.from_pretrained(self.model_id).to(self.device)
+            self._model.eval()
+        return self._model, self._proc
+
+    def synth(self, text: str, voice: str):
+        """Return (mono float32 audio, sample_rate)."""
+        import torch
+        model, proc = self._ensure()
+        dev = next(model.parameters()).device
+        inputs = proc(text, voice_preset=voice)
+        inputs = {k: (v.to(dev) if isinstance(v, torch.Tensor) else v)
+                  for k, v in inputs.items()}
+        with torch.no_grad():
+            audio = model.generate(**inputs)
+        arr = audio.cpu().numpy().squeeze().astype(np.float32)
+        sr  = model.generation_config.sample_rate
+        return arr, sr
+
+
 # ---- the renderer -------------------------------------------------------
 
 class LocalRenderer:
@@ -230,12 +269,14 @@ class LocalRenderer:
         out_dir: str | Path = "/tmp/myAIbeats",
         synth: MusicGenSynth | None = None,
         scorer: CLAPScorer | None = None,
+        bark: "BarkVocal | None" = None,
         fps: int = 24,
     ):
         self.out_dir = Path(out_dir)
         self.out_dir.mkdir(parents=True, exist_ok=True)
         self.synth  = synth  or MusicGenSynth()
         self.scorer = scorer or CLAPScorer()
+        self.bark   = bark    # lazily constructed on first vocal() if None
 
     # ---- Phase 2: synthesize + CLAP score --------------------------------
 
@@ -350,7 +391,49 @@ class LocalRenderer:
             channels=_ffprobe_channels(str(out)) if out.exists() else 0,
         )
 
-    # ---- Phase 4: vocal (pending) ----------------------------------------
+    # ---- Phase 4: vocal (Bark, non-blocking) -----------------------------
 
     def vocal(self, section: Section, lyric: str, spec: SongSpec) -> VocalOut:
-        raise NotImplementedError("vocal(): Phase 4 — Bark TTS")
+        """Generate a sung vocal line with Bark. Non-blocking by contract:
+        any failure returns an empty VocalOut so the gate drops it and the
+        instrumental ships regardless (Article IV)."""
+        try:
+            if self.bark is None:
+                self.bark = BarkVocal()
+            # ♪ wrapping biases Bark toward singing rather than speaking
+            text = f"♪ {lyric} ♪"
+            arr, sr = self.bark.synth(text, spec.vocals.voice)
+            if arr is None or len(arr) == 0:
+                return VocalOut(audio_path=None, duration_s=None)
+            path = self.out_dir / f"{section.id}_vocal.wav"
+            _write_wav(path, arr, sr)
+            return VocalOut(audio_path=str(path), duration_s=len(arr) / sr)
+        except Exception as e:
+            print(f"[Bark] vocal synth failed for {section.id}: {e}")
+            return VocalOut(audio_path=None, duration_s=None)
+
+    def mix_vocal(self, instrumental_path: str, vocal_path: str,
+                  out_path: str) -> str:
+        """Overlay the vocal onto the instrumental section. Instrumental is
+        ducked to 0.78 so the vocal sits on top. Vocal is resampled to the
+        output rate, padded, and trimmed to the instrumental length."""
+        try:
+            instr_dur = _ffprobe_duration(instrumental_path)
+            sr = OUTPUT_SR
+            filt = (
+                f"[1:a]aresample={sr},apad,atrim=0:{instr_dur},"
+                f"aformat=channel_layouts=stereo[v];"
+                f"[0:a]volume=0.78[i];"
+                f"[i][v]amix=inputs=2:duration=first:normalize=0[out]"
+            )
+            cmd = [
+                "ffmpeg", "-i", instrumental_path, "-i", vocal_path,
+                "-filter_complex", filt, "-map", "[out]",
+                "-ar", str(sr), "-ac", "2", "-c:a", "pcm_s16le",
+                "-y", out_path,
+            ]
+            subprocess.run(cmd, check=True, capture_output=True)
+            return out_path
+        except Exception as e:
+            print(f"[mix_vocal] failed, using instrumental: {e}")
+            return instrumental_path   # graceful: vocals are enhancement
