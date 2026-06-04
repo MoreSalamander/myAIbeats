@@ -41,6 +41,14 @@
 
   .chk{display:flex;align-items:center;gap:8px;margin-top:12px}
   .chk input{width:auto}
+  .qual{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+  .qbtn{padding:9px 6px;border:1px solid var(--line);border-radius:8px;
+    background:var(--panel2);color:var(--muted);font-size:12px;font-weight:700;
+    cursor:pointer;text-align:center;transition:.15s;display:flex;flex-direction:column;gap:2px}
+  .qbtn span{font-size:9px;font-weight:500;opacity:.7;font-family:var(--mono)}
+  .qbtn:hover{border-color:var(--accent2);color:var(--ink)}
+  .qbtn.active{background:rgba(109,179,242,.16);border-color:var(--accent2);
+    color:var(--accent2);box-shadow:0 0 14px rgba(109,179,242,.2)}
   button#go{width:100%;margin-top:16px;padding:12px;border:0;border-radius:9px;
     background:linear-gradient(135deg,var(--accent),#f0a050);color:#1a1206;font-weight:800;
     font-size:14px;cursor:pointer;letter-spacing:.02em;transition:.15s;
@@ -132,7 +140,12 @@
     </div>
 
     <h2 class="sep">Render</h2>
-    <label>Sections to render (blank = all)</label>
+    <label>Quality</label>
+    <div class="qual">
+      <div class="qbtn" data-quality="draft">⚡ Draft<span>small · ~3× faster</span></div>
+      <div class="qbtn active" data-quality="final">✦ Final<span>medium · best</span></div>
+    </div>
+    <label style="margin-top:10px">Sections to render (blank = all)</label>
     <input id="limit" type="number" min="1" placeholder="all" />
     <div class="chk"><input id="vocals" type="checkbox" /><label style="margin:0">Vocals (Bark, non-blocking)</label></div>
     <button id="go">▶ Generate</button>
@@ -288,7 +301,7 @@ async function go(){
   $('songCard').style.display='none';
   $('sections').innerHTML='<div class="empty">Rendering…</div>';
   renderArc(spec.sections);
-  const body={spec_name:name,limit:$('limit').value?parseInt($('limit').value):null,vocals:$('vocals').checked};
+  const body={spec_name:name,limit:$('limit').value?parseInt($('limit').value):null,vocals:$('vocals').checked,quality:currentQuality};
   try{
     const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const rd=res.body.getReader();const dec=new TextDecoder();let buf='';
@@ -298,6 +311,13 @@ async function go(){
   finally{isRunning=false;$('go').disabled=false;}
 }
 $('go').addEventListener('click',go);
+
+// quality toggle
+let currentQuality='final';
+document.querySelectorAll('.qbtn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.qbtn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');currentQuality=b.dataset.quality;
+}));
 
 async function loadOutput(){
   const name=$('specSel').value;

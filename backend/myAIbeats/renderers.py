@@ -67,6 +67,12 @@ class BeatRenderer(Protocol):
         the instrumental, never the vocal-mixed version."""
         ...
 
+    def tone_pad(self, section: Section, spec: SongSpec) -> str:
+        """Defined fallback (Article III/VI): synthesize a neutral tone pad
+        for a section that failed all retries, write it to disk, and return
+        the path. A real file must exist so the stitch never breaks."""
+        ...
+
 
 # ---- offline fake -------------------------------------------------------
 
@@ -122,3 +128,7 @@ class ScriptedRenderer:
                   out_path: str) -> str:
         # offline: no real mixing — the mixed section is just the instrumental
         return instrumental_path
+
+    def tone_pad(self, section: Section, spec: SongSpec) -> str:
+        # offline: fake path, no file written (scripted stitch is also fake)
+        return f"/tmp/myAIbeats/{section.id}_pad.wav"

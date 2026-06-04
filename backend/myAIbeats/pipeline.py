@@ -113,11 +113,13 @@ def run(
             if attempt < max_retries:
                 em.retry("section_synth", section=section.id, attempt=attempt + 1)
         else:
-            # exhausted retries — use tone pad fallback (Article III)
+            # exhausted retries — use tone pad fallback (Article III/VI).
+            # The renderer writes a real in-key pad file so the stitch holds.
             tone_pad = True
-            em.fallback("section_synth", section=section.id, to="tone_pad")
+            pad_path = renderer.tone_pad(section, spec)
+            em.fallback("section_synth", section=section.id, to="tone_pad", path=pad_path)
             out = type(out)(
-                audio_path=TONE_PAD_PATH,
+                audio_path=pad_path,
                 duration_s=declared_s,
                 clap_score=0.0,
                 used_continuation=False,

@@ -96,6 +96,43 @@ def _ffprobe_duration(path: str) -> float:
     return float(r.stdout.strip())
 
 
+# semitone offset from A; used to tune the fallback pad to the song's key
+_NOTE_SEMITONES = {
+    "C": 3, "C#": 4, "DB": 4, "D": 5, "D#": 6, "EB": 6, "E": 7, "F": 8,
+    "F#": 9, "GB": 9, "G": 10, "G#": 11, "AB": 11, "A": 0, "A#": 1, "BB": 1, "B": 2,
+}
+
+
+def _key_root_freq(key: str, base: float = 110.0) -> float:
+    """Map a key string ('A minor', 'F# major', 'G') to a low root frequency
+    (~A2 register) so the fallback pad is at least in key."""
+    tok = (key or "A").strip().split()[0].upper().replace("♭", "B").replace("♯", "#")
+    note = tok[:2] if len(tok) >= 2 and tok[1] in "#B" else tok[:1]
+    semis = _NOTE_SEMITONES.get(note, _NOTE_SEMITONES.get(tok[:1], 0))
+    return base * (2 ** (semis / 12.0))
+
+
+def _tone_pad_audio(duration_s: float, key: str, sr: int) -> np.ndarray:
+    """A soft, in-key sustained pad (root + fifth + octave) with gentle
+    fades and a touch of stereo width. Quiet by design — it's a graceful
+    placeholder, not a feature."""
+    f0 = _key_root_freq(key)
+    t = np.linspace(0, duration_s, int(duration_s * sr), endpoint=False)
+    pad = (0.6 * np.sin(2 * np.pi * f0 * t)
+           + 0.4 * np.sin(2 * np.pi * f0 * 1.5 * t)
+           + 0.3 * np.sin(2 * np.pi * f0 * 2.0 * t)) * 0.12
+    fade = max(1, int(sr * 0.5))
+    env = np.ones_like(pad)
+    env[:fade] = np.linspace(0, 1, fade)
+    env[-fade:] = np.linspace(1, 0, fade)
+    pad *= env
+    # slight detune on the right channel for width
+    right = ((0.6 * np.sin(2 * np.pi * f0 * 1.003 * t)
+              + 0.4 * np.sin(2 * np.pi * f0 * 1.5 * t)
+              + 0.3 * np.sin(2 * np.pi * f0 * 2.0 * t)) * 0.12) * env
+    return np.stack([pad, right]).astype(np.float32)
+
+
 def _ffprobe_channels(path: str) -> int:
     r = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "a:0",
@@ -437,3 +474,13 @@ class LocalRenderer:
         except Exception as e:
             print(f"[mix_vocal] failed, using instrumental: {e}")
             return instrumental_path   # graceful: vocals are enhancement
+
+    def tone_pad(self, section: Section, spec: SongSpec) -> str:
+        """Write a real, in-key tone pad WAV for a section that failed all
+        retries (Article VI defined fallback). A file always exists, so the
+        stitch never breaks on a fallback."""
+        dur = section.duration_at_tempo(spec.song.tempo)
+        audio = _tone_pad_audio(dur, spec.song.key, OUTPUT_SR)
+        path = self.out_dir / f"{section.id}_pad.wav"
+        _write_wav(path, audio, OUTPUT_SR)
+        return str(path)

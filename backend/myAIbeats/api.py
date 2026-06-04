@@ -32,6 +32,13 @@ class GenerateRequest(BaseModel):
     spec_name: str
     limit: Optional[int] = None
     vocals: bool = False
+    quality: str = "final"     # "draft" (small, ~3× faster) | "final" (medium)
+
+
+QUALITY_MODELS = {
+    "draft": "facebook/musicgen-stereo-small",
+    "final": "facebook/musicgen-stereo-medium",
+}
 
 
 # ---- streaming generate -------------------------------------------------
@@ -62,9 +69,12 @@ def _ndjson_generate(req: GenerateRequest) -> Iterator[str]:
 
     def _worker():
         try:
-            from myAIbeats.local import LocalRenderer
+            from myAIbeats.local import LocalRenderer, MusicGenSynth
             from myAIbeats.pipeline import run
-            r = LocalRenderer(out_dir=out_dir)
+            model_id = QUALITY_MODELS.get(req.quality, QUALITY_MODELS["final"])
+            em.emit("step_start", "model_load", quality=req.quality, model=model_id)
+            r = LocalRenderer(out_dir=out_dir, synth=MusicGenSynth(model_id=model_id))
+            em.emit("step_complete", "model_load", quality=req.quality)
             run(spec, r, em, out_path=song_path, limit=req.limit)
         except Exception as exc:
             em.error("server", message=f"{type(exc).__name__}: {exc}")
