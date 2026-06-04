@@ -164,9 +164,12 @@ def run(
     section_paths = [s.audio_path for s in manifest.sections]
     stitch_out = renderer.stitch(section_paths, spec, out_path)
 
+    # Expected duration is based on ACTUAL rendered section lengths (MusicGen
+    # overshoots nominal durations by a few seconds each), minus crossfade
+    # overlaps. Using nominal spec durations here would falsely fail the gate.
     expected_s = sum(
-        sec.duration_at_tempo(spec.song.tempo) for sec in spec.sections
-    ) - (len(spec.sections) - 1) * spec.audio.crossfade_s
+        s.duration_s for s in manifest.sections
+    ) - (len(manifest.sections) - 1) * spec.audio.crossfade_s
 
     stitch_gate = V.stitch_verify(
         exists=stitch_out.exists,

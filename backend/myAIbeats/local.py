@@ -96,6 +96,16 @@ def _ffprobe_duration(path: str) -> float:
     return float(r.stdout.strip())
 
 
+def _ffprobe_channels(path: str) -> int:
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a:0",
+         "-show_entries", "stream=channels",
+         "-of", "default=noprint_wrappers=1:nokey=1", path],
+        capture_output=True, text=True, check=True,
+    )
+    return int(r.stdout.strip())
+
+
 # ---- MusicGen synthesizer -----------------------------------------------
 
 class MusicGenSynth:
@@ -270,7 +280,7 @@ class LocalRenderer:
             used_continuation=used_continuation,
         )
 
-    # ---- Phase 3: stitch (pending) ---------------------------------------
+    # ---- Phase 3: stitch (ffmpeg acrossfade + loudnorm) ------------------
 
     def stitch(
         self,
@@ -278,7 +288,67 @@ class LocalRenderer:
         spec: SongSpec,
         out_path: str,
     ) -> StitchOut:
-        raise NotImplementedError("stitch(): Phase 3 — ffmpeg acrossfade + normalize")
+        """Crossfade sections together and loudness-normalize the master.
+
+        Sections are chained with acrossfade (each overlap = crossfade_s),
+        so transitions are seamless rather than hard cuts. The final mix is
+        normalized to -14 LUFS (streaming standard) when spec.audio.normalize.
+        """
+        out = Path(out_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        xfade = spec.audio.crossfade_s
+        want_channels = 2 if spec.audio.channels == "stereo" else 1
+
+        # build -i args
+        inputs: list[str] = []
+        for p in section_paths:
+            inputs += ["-i", p]
+
+        n = len(section_paths)
+        filt_parts: list[str] = []
+
+        if n == 1:
+            chain_label = "0:a"
+        else:
+            # chain acrossfade: [0:a][1:a]acrossfade->a1; [a1][2:a]acrossfade->a2; ...
+            prev = "0:a"
+            for i in range(1, n):
+                label = f"a{i}"
+                filt_parts.append(
+                    f"[{prev}][{i}:a]acrossfade=d={xfade}:c1=tri:c2=tri[{label}]"
+                )
+                prev = label
+            chain_label = prev
+
+        # loudness normalize the final chain (or just relabel)
+        if spec.audio.normalize:
+            filt_parts.append(f"[{chain_label}]loudnorm=I=-14:TP=-1.5:LRA=11[out]")
+            map_label = "[out]"
+        else:
+            if n == 1:
+                # single section, no normalize — copy through aformat to set rate
+                filt_parts.append(f"[0:a]aresample={spec.audio.sample_rate}[out]")
+                map_label = "[out]"
+            else:
+                map_label = f"[{chain_label}]"
+
+        cmd = ["ffmpeg", *inputs]
+        if filt_parts:
+            cmd += ["-filter_complex", ";".join(filt_parts), "-map", map_label]
+        else:
+            cmd += ["-map", f"[{chain_label}]"]
+        cmd += ["-ar", str(spec.audio.sample_rate),
+                "-ac", str(want_channels),
+                "-c:a", "pcm_s16le", "-y", str(out)]
+
+        subprocess.run(cmd, check=True, capture_output=True)
+
+        return StitchOut(
+            path=str(out),
+            exists=out.exists(),
+            duration_s=_ffprobe_duration(str(out)) if out.exists() else 0.0,
+            channels=_ffprobe_channels(str(out)) if out.exists() else 0,
+        )
 
     # ---- Phase 4: vocal (pending) ----------------------------------------
 
