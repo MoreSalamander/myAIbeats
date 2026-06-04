@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>my-AI-beats</title>
+<style>
+  :root {
+    --bg:#0b0c10; --surface:#141620; --surface2:#1c1f2e; --ink:#e7e9ee;
+    --muted:#8b90a0; --line:#272b3d; --accent:#e08a3c; --accent2:#6db3f2;
+    --ok:#5ec27e; --bad:#e06c6c; --warn:#e0c14a; --neon:#39ff14;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;
+       background-image:radial-gradient(circle at 50% -10%,rgba(57,255,20,.06),transparent 55%);}
+
+  header{padding:14px 22px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:14px}
+  header h1{font-size:18px;margin:0;letter-spacing:.3px}
+  header h1 b{color:var(--accent);font-weight:800}
+  header .ms{color:var(--neon);font-weight:700;text-shadow:0 0 12px rgba(57,255,20,.5)}
+  header .tag{color:var(--muted);font-size:11px}
+
+  .wrap{display:grid;grid-template-columns:260px 1fr 320px;height:calc(100vh - 52px)}
+  .col{overflow-y:auto;padding:16px}
+  .left{border-right:1px solid var(--line)}
+  .right{border-left:1px solid var(--line);background:#0d0e15}
+
+  h2{font-size:11px;text-transform:uppercase;letter-spacing:.13em;color:var(--muted);margin:0 0 12px}
+  h2.sep{margin-top:20px;padding-top:14px;border-top:1px solid var(--line)}
+  label{display:block;font-size:11px;color:var(--muted);margin:10px 0 4px}
+  select,input[type=number]{width:100%;background:var(--surface2);border:1px solid var(--line);
+    color:var(--ink);border-radius:7px;padding:8px 10px;font-size:13px}
+
+  .meta{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-top:10px;display:none}
+  .meta .t{font-weight:700;font-size:14px;margin-bottom:5px}
+  .meta .kv{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin:2px 0}
+  .meta .kv b{color:var(--ink);font-weight:600}
+  .meta .feel{font-size:11px;color:var(--accent2);font-style:italic;margin-top:8px;line-height:1.4}
+
+  .chk{display:flex;align-items:center;gap:8px;margin-top:12px}
+  .chk input{width:auto}
+  button#go{width:100%;margin-top:16px;padding:12px;border:0;border-radius:9px;
+    background:linear-gradient(135deg,var(--accent),#f0a050);color:#1a1206;font-weight:800;
+    font-size:14px;cursor:pointer;letter-spacing:.02em;transition:.15s;
+    box-shadow:0 4px 20px rgba(224,138,60,.25)}
+  button#go:hover:not(:disabled){filter:brightness(1.1);box-shadow:0 6px 28px rgba(224,138,60,.4)}
+  button#go:disabled{opacity:.4;cursor:default;box-shadow:none}
+  .hint{color:var(--muted);font-size:11px;margin-top:9px;line-height:1.5}
+
+  /* ===== ENERGY ARC — the centerpiece ===== */
+  .arc-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .arc-head .status{font-size:11px;color:var(--muted);font-family:var(--mono)}
+  .arc-head .status.live{color:var(--neon);text-shadow:0 0 8px rgba(57,255,20,.5)}
+  .arc{display:flex;align-items:flex-end;gap:6px;height:300px;padding:16px;
+    background:linear-gradient(180deg,var(--surface) 0%,#0e1019 100%);
+    border:1px solid var(--line);border-radius:12px;position:relative;overflow:hidden}
+  .arc::before{content:"";position:absolute;inset:0;
+    background-image:repeating-linear-gradient(180deg,transparent 0 59px,rgba(255,255,255,.03) 59px 60px);
+    pointer-events:none}
+  .bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+    height:100%;gap:6px;position:relative;z-index:1}
+  .bar{width:100%;border-radius:6px 6px 3px 3px;position:relative;transition:height .5s cubic-bezier(.2,.8,.2,1),box-shadow .3s;
+    min-height:8px;background:var(--surface2);border:1px solid var(--line)}
+  .bar.pending{opacity:.4}
+  .bar.live{animation:barpulse 1s ease-in-out infinite}
+  .bar.pass{border-color:transparent}
+  .bar.fallback{background:repeating-linear-gradient(45deg,var(--warn),var(--warn) 4px,transparent 4px,transparent 8px)!important}
+  @keyframes barpulse{0%,100%{box-shadow:0 0 8px rgba(57,255,20,.3)}50%{box-shadow:0 0 26px rgba(57,255,20,.85)}}
+  .bar .eq{position:absolute;inset:0;display:none;align-items:flex-end;justify-content:center;gap:2px;padding:4px}
+  .bar.live .eq{display:flex}
+  .bar .eq i{width:3px;background:rgba(255,255,255,.55);border-radius:2px;animation:eq .6s ease-in-out infinite}
+  .bar .eq i:nth-child(2){animation-delay:.15s}
+  .bar .eq i:nth-child(3){animation-delay:.3s}
+  .bar .eq i:nth-child(4){animation-delay:.45s}
+  @keyframes eq{0%,100%{height:18%}50%{height:75%}}
+  .bar-label{font-size:10px;color:var(--muted);text-align:center;white-space:nowrap}
+  .bar-label .ty{display:block;color:var(--ink);font-weight:600;text-transform:capitalize}
+  .bar-clap{font-family:var(--mono);font-size:10px;font-weight:700;min-height:13px}
+  .cont-link{position:absolute;top:-2px;left:-7px;color:var(--accent2);font-size:13px;z-index:2;opacity:0;transition:opacity .4s}
+  .cont-link.on{opacity:.9}
+
+  /* event log */
+  #log{font-family:var(--mono);font-size:11.5px;margin-top:14px;max-height:230px;overflow-y:auto}
+  .ev{padding:5px 9px;border-radius:5px;margin-bottom:4px;background:var(--surface);
+    border:1px solid var(--line);display:flex;gap:8px;align-items:baseline}
+  .ev .stg{color:var(--accent2)} .ev .msg{color:var(--muted);font-size:11px}
+  .badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;text-transform:uppercase;flex-shrink:0}
+  .b-pass{background:rgba(94,194,126,.15);color:var(--ok)}
+  .b-fail{background:rgba(224,108,108,.15);color:var(--bad)}
+  .b-warn{background:rgba(224,193,74,.15);color:var(--warn)}
+  .b-run{background:rgba(109,179,242,.15);color:var(--accent2)}
+  .b-done{background:rgba(57,255,20,.15);color:var(--neon)}
+  .b-gem{background:rgba(57,255,20,.12);color:var(--neon)}
+
+  /* right panel */
+  #status{font-size:12px;color:var(--muted);margin-bottom:12px}
+  #status.ok{color:var(--neon)} #status.bad{color:var(--bad)}
+  .song-card{background:linear-gradient(135deg,var(--surface2),#221d14);border:1px solid rgba(224,138,60,.3);
+    border-radius:11px;padding:14px;margin-bottom:16px;display:none}
+  .song-card .st{font-weight:800;font-size:15px;margin-bottom:3px}
+  .song-card .sm{color:var(--muted);font-size:11px;margin-bottom:10px}
+  audio{width:100%;margin-top:4px}
+  .sec-item{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-bottom:7px}
+  .sec-item .sh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+  .sec-item .sid{font-family:var(--mono);font-size:11px;color:var(--accent2)}
+  .sec-item .sc{font-family:var(--mono);font-size:10px;color:var(--ok)}
+  .empty{color:var(--muted);font-size:12px;font-style:italic}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>my-<b>AI</b>-beats</h1>
+  <span class="tag">A <span class="ms">MoreSalamander</span> StudioLabs production · local music generation</span>
+</header>
+
+<div class="wrap">
+
+  <!-- LEFT -->
+  <div class="col left">
+    <h2>Song spec</h2>
+    <select id="specSel"><option value="">Loading…</option></select>
+    <div class="meta" id="meta">
+      <div class="t" id="mTitle"></div>
+      <div class="kv"><span>genre</span><b id="mGenre"></b></div>
+      <div class="kv"><span>tempo</span><b id="mTempo"></b></div>
+      <div class="kv"><span>key</span><b id="mKey"></b></div>
+      <div class="kv"><span>mood</span><b id="mMood"></b></div>
+      <div class="feel" id="mFeel"></div>
+    </div>
+
+    <h2 class="sep">Render</h2>
+    <label>Sections to render (blank = all)</label>
+    <input id="limit" type="number" min="1" placeholder="all" />
+    <div class="chk"><input id="vocals" type="checkbox" /><label style="margin:0">Vocals (Bark, non-blocking)</label></div>
+    <button id="go">▶ Generate</button>
+    <p class="hint">Each section streams through MusicGen with audio continuation —
+      every section grows from the last. CLAP scores each one. ~2 min / section.</p>
+  </div>
+
+  <!-- CENTER: ENERGY ARC -->
+  <div class="col mid">
+    <div class="arc-head">
+      <h2 style="margin:0">Energy Arc</h2>
+      <span class="status" id="arcStatus">idle</span>
+    </div>
+    <div class="arc" id="arc"><div class="empty" style="margin:auto">Select a spec to see its energy arc.</div></div>
+
+    <h2 style="margin-top:18px">Event stream</h2>
+    <div id="log"></div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="col right">
+    <h2>Output</h2>
+    <div id="status">Idle — pick a spec and hit Generate.</div>
+    <div class="song-card" id="songCard">
+      <div class="st" id="songTitle"></div>
+      <div class="sm" id="songMeta"></div>
+      <audio id="songPlayer" controls></audio>
+    </div>
+    <div id="sections"><div class="empty">Sections appear here as they render.</div></div>
+  </div>
+
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let spec=null, secById={}, isRunning=false;
+let pass=0,fail=0;
+
+// energy → [r,g,b] : calm blue (low) → neon green (high).
+// Both cool/vivid, so interpolation stays saturated — no muddy midpoint.
+function energyRGB(e){ return mix([93,160,246],[57,255,20],Math.max(0,Math.min(1,e))); }
+function mix(a,b,t){return a.map((v,i)=>Math.round(v+(b[i]-v)*t));}
+function rgb(a){return `rgb(${a.join(',')})`;}
+function rgba(a,al){return `rgba(${a.join(',')},${al})`;}
+
+async function loadSpecs(){
+  const specs=await (await fetch('/api/specs')).json();
+  const sel=$('specSel');
+  sel.innerHTML=specs.length?specs.map(s=>`<option value="${s.name}">${s.title}</option>`).join(''):'<option value="">none</option>';
+  if(specs.length){onSpec();}
+}
+$('specSel').addEventListener('change',onSpec);
+
+async function onSpec(){
+  const name=$('specSel').value; if(!name)return;
+  spec=await (await fetch(`/api/specs/${name}`)).json();
+  $('mTitle').textContent=spec.song.title;
+  $('mGenre').textContent=spec.song.genre;
+  $('mTempo').textContent=spec.song.tempo+' BPM';
+  $('mKey').textContent=spec.song.key;
+  $('mMood').textContent=spec.song.mood;
+  $('mFeel').textContent=spec.song.reference_feel||'';
+  $('meta').style.display='block';
+  renderArc(spec.sections);
+}
+
+function renderArc(sections){
+  secById={};
+  const arc=$('arc'); arc.innerHTML='';
+  sections.forEach((s,i)=>{
+    const wrap=document.createElement('div');wrap.className='bar-wrap';
+    const h=Math.round(20+s.energy*80); // 20–100%
+    const c=energyRGB(s.energy);
+    const grad=`linear-gradient(180deg,${rgb(c)},${rgba(c,0.33)})`;
+    wrap.innerHTML=`
+      ${i>0&&s.continuation?'<span class="cont-link" id="link-'+s.id+'">↝</span>':''}
+      <div class="bar pending" id="bar-${s.id}" style="height:${h}%;background:${grad}">
+        <div class="eq"><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="bar-clap" id="clap-${s.id}"></div>
+      <div class="bar-label"><span class="ty">${s.type}</span>${s.id} · e${s.energy}</div>`;
+    arc.appendChild(wrap);
+    secById[s.id]={energy:s.energy};
+  });
+}
+
+function badge(c,t){return `<span class="badge ${c}">${t}</span>`;}
+function logEv(html){const d=document.createElement('div');d.className='ev';d.innerHTML=html;$('log').appendChild(d);d.scrollIntoView({block:'nearest'});}
+
+function handle(e){
+  const sid=e.section;
+  switch(e.event){
+    case 'step_start':
+      if(e.stage==='section_synth'&&sid){
+        const bar=$('bar-'+sid);if(bar){bar.classList.remove('pending');bar.classList.add('live');}
+        $('arcStatus').textContent=`synthesizing ${sid} (${e.index}/${e.total})…`;
+        $('arcStatus').classList.add('live');
+        if(e.continuation){const l=$('link-'+sid);if(l)l.classList.add('on');}
+        logEv(`${badge('b-run','synth')} <span class="stg">${sid}</span> <span class="msg">${e.type} · energy ${e.energy}${e.continuation?' · ↝ continuation':''}</span>`);
+      }
+      if(e.stage==='stitch'){$('arcStatus').textContent='stitching…';logEv(`${badge('b-run','stitch')} <span class="stg">crossfade + master</span>`);}
+      break;
+    case 'gate_pass':
+      pass++;
+      if(e.stage==='section_verify'&&sid){
+        const c=$('clap-'+sid);if(c){c.textContent=e.clap_score;c.style.color='var(--ok)';}
+      }
+      if(e.stage==='stitch_verify')logEv(`${badge('b-pass','pass')} <span class="stg">stitch_verify</span> <span class="msg">${e.duration_s}s · ${e.channels}ch</span>`);
+      break;
+    case 'gate_fail':
+      fail++;
+      if(e.stage==='section_verify'&&sid){const c=$('clap-'+sid);if(c){c.textContent=e.clap_score;c.style.color='var(--bad)';}}
+      logEv(`${badge('b-fail','fail')} <span class="stg">${e.stage}</span> <span class="msg">${sid||''} ${e.detail||''}</span>`);
+      break;
+    case 'retry':
+      logEv(`${badge('b-warn','retry '+(e.attempt||''))} <span class="stg">${sid||e.stage}</span>`);
+      break;
+    case 'fallback':
+      {const bar=$('bar-'+sid);if(bar){bar.classList.remove('live');bar.classList.add('fallback');}}
+      logEv(`${badge('b-warn','fallback')} <span class="stg">${sid}</span> <span class="msg">tone pad</span>`);
+      break;
+    case 'skip':
+      logEv(`${badge('b-warn','skip')} <span class="stg">${e.stage}</span> <span class="msg">${sid||''}</span>`);
+      break;
+    case 'step_complete':
+      if(e.stage==='section_synth'&&sid){
+        const bar=$('bar-'+sid);
+        if(bar){bar.classList.remove('live');if(!e.fallback)bar.classList.add('pass');}
+        const tag=e.continuation?` ${badge('b-gem','↝ gem')}`:'';
+        logEv(`${badge('b-pass','done')} <span class="stg">${sid}</span> <span class="msg">clap ${e.clap}</span>${tag}`);
+      }
+      break;
+    case 'done':
+      $('arcStatus').textContent=`done · ${e.gates_passed} gates passed`;
+      $('arcStatus').classList.remove('live');
+      logEv(`${badge('b-done','complete')} <span class="msg">${e.sections} sections · ${e.total_duration_s}s</span>`);
+      $('status').textContent=`Complete — ${e.gates_passed} passed, ${e.gates_failed} failed${e.tone_pad_fallbacks?', '+e.tone_pad_fallbacks+' fallback':''}`;
+      $('status').className='ok';
+      loadOutput();
+      break;
+    case 'error':
+      $('status').textContent='Error: '+(e.message||e.stage);$('status').className='bad';
+      $('arcStatus').textContent='error';$('arcStatus').classList.remove('live');
+      logEv(`${badge('b-fail','error')} <span class="msg">${e.message||''}</span>`);
+      break;
+  }
+}
+
+async function go(){
+  const name=$('specSel').value; if(!name||isRunning)return;
+  isRunning=true;$('go').disabled=true;$('log').innerHTML='';pass=0;fail=0;
+  $('status').textContent='Connecting…';$('status').className='';
+  $('songCard').style.display='none';
+  $('sections').innerHTML='<div class="empty">Rendering…</div>';
+  renderArc(spec.sections);
+  const body={spec_name:name,limit:$('limit').value?parseInt($('limit').value):null,vocals:$('vocals').checked};
+  try{
+    const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const rd=res.body.getReader();const dec=new TextDecoder();let buf='';
+    while(true){const{value,done}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});
+      let nl;while((nl=buf.indexOf('\n'))>=0){const ln=buf.slice(0,nl).trim();buf=buf.slice(nl+1);if(ln){try{handle(JSON.parse(ln));}catch{}}}}
+  }catch(err){$('status').textContent='Stream error: '+err.message;$('status').className='bad';}
+  finally{isRunning=false;$('go').disabled=false;}
+}
+$('go').addEventListener('click',go);
+
+async function loadOutput(){
+  const name=$('specSel').value;
+  const data=await (await fetch(`/api/output/${name}`)).json();
+  const files=data.files||[];
+  const song=files.find(f=>f===`${name}.wav`);
+  if(song){
+    $('songTitle').textContent=spec.song.title;
+    $('songMeta').textContent=`${spec.song.genre} · ${spec.song.tempo} BPM · ${spec.song.key}`;
+    $('songPlayer').src=`/api/output/${name}/${song}?t=${Date.now()}`;
+    $('songCard').style.display='block';
+  }
+  // per-section: prefer mixed (vocal) over bare, hide the full song + tone pad
+  const secs=spec.sections.map(s=>s.id);
+  let html='';
+  secs.forEach(id=>{
+    const mixed=files.find(f=>f===`${id}_mixed.wav`);
+    const bare=files.find(f=>f===`${id}.wav`);
+    const f=mixed||bare; if(!f)return;
+    const clap=$('clap-'+id)?.textContent||'';
+    html+=`<div class="sec-item"><div class="sh"><span class="sid">${id}${mixed?' ♪':''}</span><span class="sc">${clap?'clap '+clap:''}</span></div>
+      <audio controls src="/api/output/${name}/${f}?t=${Date.now()}"></audio></div>`;
+  });
+  $('sections').innerHTML=html||'<div class="empty">No section files.</div>';
+}
+
+loadSpecs();
+</script>
+</body>
+</html>

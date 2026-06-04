@@ -73,19 +73,21 @@ def run(
     emitter: EventEmitter | None = None,
     out_path: str = "/tmp/myAIbeats/song.wav",
     max_retries: int = MAX_RETRIES,
+    limit: int | None = None,
 ) -> SongManifest:
     em = emitter or EventEmitter()
+    sections = spec.sections[:limit] if limit else spec.sections
     em.step_start("spec_load", title=spec.song.title,
-                  sections=len(spec.sections), tempo=spec.song.tempo)
+                  sections=len(sections), tempo=spec.song.tempo)
     em.step_complete("spec_load")
 
     manifest = SongManifest(title=spec.song.title)
     prev_audio: str | None = None   # the continuation thread
 
-    for i, section in enumerate(spec.sections):
+    for i, section in enumerate(sections):
         declared_s = section.duration_at_tempo(spec.song.tempo)
         em.step_start("section_synth", section=section.id,
-                      index=i + 1, total=len(spec.sections),
+                      index=i + 1, total=len(sections),
                       type=section.type, energy=section.energy,
                       continuation=section.continuation and prev_audio is not None)
 
