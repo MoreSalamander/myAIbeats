@@ -1,0 +1,16 @@
+[project]
+name = "myAIbeats"
+version = "0.1.0"
+description = "Local-first, verification-driven music generator (MoreSalamander StudioLabs)"
+requires-python = ">=3.12"
+# Phase 1: ZERO runtime deps — scaffold proven on stdlib alone.
+# Phase 2+ adds: torch, transformers, diffusers, audiocraft/musicgen,
+#   laion-clap (section verify), suno-bark (vocals), ffmpeg (stitch)
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

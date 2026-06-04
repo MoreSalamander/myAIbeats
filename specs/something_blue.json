@@ -1,0 +1,92 @@
+{
+  "song": {
+    "title": "Something Blue",
+    "genre": "indie folk",
+    "tempo": 88,
+    "key": "G",
+    "mode": "major",
+    "time_signature": "4/4",
+    "mood": "contemplative, warm, bittersweet",
+    "instruments": ["acoustic guitar", "brushed drums", "piano", "cello"],
+    "reference_feel": "Iron & Wine meets Bon Iver — intimate and cinematic",
+    "continuation_secs": 3.0
+  },
+  "sections": [
+    {
+      "id": "s01",
+      "type": "intro",
+      "bars": 8,
+      "prompt": "gentle acoustic guitar fingerpicking, G major, 88 BPM, warm, contemplative, minimal, intimate, folk",
+      "energy": 0.2,
+      "continuation": false
+    },
+    {
+      "id": "s02",
+      "type": "verse",
+      "bars": 16,
+      "prompt": "acoustic guitar with soft brushed drums, G major, 88 BPM, storytelling, intimate, folk, light percussion",
+      "energy": 0.45,
+      "continuation": true
+    },
+    {
+      "id": "s03",
+      "type": "chorus",
+      "bars": 8,
+      "prompt": "full acoustic guitar strumming, brushed drums, piano, G major, 88 BPM, uplifting, hopeful, emotional peak, indie folk",
+      "energy": 0.85,
+      "continuation": true
+    },
+    {
+      "id": "s04",
+      "type": "verse",
+      "bars": 16,
+      "prompt": "acoustic guitar with soft brushed drums, G major, 88 BPM, reflective, slightly more developed than first verse, folk",
+      "energy": 0.5,
+      "continuation": true
+    },
+    {
+      "id": "s05",
+      "type": "chorus",
+      "bars": 8,
+      "prompt": "full acoustic guitar strumming, brushed drums, piano, cello swell, G major, 88 BPM, emotional, powerful, cathartic",
+      "energy": 0.9,
+      "continuation": true
+    },
+    {
+      "id": "s06",
+      "type": "bridge",
+      "bars": 8,
+      "prompt": "stripped back acoustic guitar only, G major, 88 BPM, quiet, introspective, vulnerable, sparse, folk",
+      "energy": 0.35,
+      "continuation": true
+    },
+    {
+      "id": "s07",
+      "type": "chorus",
+      "bars": 8,
+      "prompt": "full acoustic guitar, brushed drums, piano, cello, G major, 88 BPM, triumphant, full-bodied, final chorus, cathartic resolution",
+      "energy": 0.95,
+      "continuation": true
+    },
+    {
+      "id": "s08",
+      "type": "outro",
+      "bars": 6,
+      "prompt": "gentle acoustic guitar fingerpicking fading, G major, 88 BPM, warm, peaceful resolution, fade out, folk",
+      "energy": 0.15,
+      "continuation": true
+    }
+  ],
+  "audio": {
+    "sample_rate": 44100,
+    "channels": "stereo",
+    "crossfade_s": 1.5,
+    "normalize": true
+  },
+  "vocals": {
+    "enabled": false,
+    "engine": "bark",
+    "voice": "v2/en_speaker_6",
+    "lyrics": {}
+  }
+}

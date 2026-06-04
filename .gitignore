@@ -1,0 +1,10 @@
+backend/.venv/
+out/
+**/__pycache__/
+.pytest_cache/
+*.wav
+*.mp3
+*.ogg
+*.safetensors
+*.bin
+*.pt
