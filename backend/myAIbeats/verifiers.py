@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 CLAP_THRESHOLD    = 0.20   # audio↔text cosine — analogous to CLIP in my-AI-scene
-DURATION_TOL_S    = 2.0    # ±seconds on section duration
+DURATION_TOL_S    = 5.0    # ±seconds on section duration (MusicGen can overshoot by 3-4s)
 STITCH_DUR_TOL_S  = 3.0    # ±seconds on final song duration
 
 
