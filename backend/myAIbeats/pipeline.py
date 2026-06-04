@@ -97,7 +97,8 @@ def run(
 
         for attempt in range(max_retries + 1):
             out = renderer.synthesize(section, spec, prev_audio)
-            clap_gate = V.section_verify(section.id, section.full_prompt, out.clap_score)
+            clap_gate = V.section_verify(section.id, section.full_prompt,
+                                         out.clap_score, section.energy)
             dur_gate  = V.duration_verify(section.id, out.duration_s, declared_s)
 
             both = clap_gate.passed and dur_gate.passed

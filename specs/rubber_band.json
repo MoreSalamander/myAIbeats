@@ -1,0 +1,74 @@
+{
+  "song": {
+    "title": "Rubber Band",
+    "genre": "Trap Orchestra",
+    "tempo": 128.0,
+    "key": "A minor",
+    "mode": "minor",
+    "time_signature": "4/4",
+    "mood": "intense and aggressive with a sense of release and catharsis",
+    "instruments": [
+      "strings",
+      "woodwinds",
+      "brass",
+      "synths",
+      "bass"
+    ],
+    "reference_feel": "Zac Clayton's unique blend of trap beats and classical strings",
+    "continuation_secs": 3.0
+  },
+  "sections": [
+    {
+      "id": "s01",
+      "type": "intro",
+      "bars": 16,
+      "prompt": "ominous and foreboding, loose twisted rubber band feel with ominous strings and dark percussion",
+      "energy": 0.2,
+      "continuation": false
+    },
+    {
+      "id": "s02",
+      "type": "build-up",
+      "bars": 32,
+      "prompt": "gradually rise in energy, tightening the rubber band with added percussion and synths",
+      "energy": 0.5,
+      "continuation": true
+    },
+    {
+      "id": "s03",
+      "type": "drop",
+      "bars": 16,
+      "prompt": "intense, aggressive main hook where the rubber band finally snaps with driving strings and heavy synths",
+      "energy": 0.9,
+      "continuation": true
+    },
+    {
+      "id": "s04",
+      "type": "bridge",
+      "bars": 16,
+      "prompt": "release tension with contrast and space, creating a sense of calm with atmospheric pads and ambient textures",
+      "energy": 0.35,
+      "continuation": true
+    },
+    {
+      "id": "s05",
+      "type": "outro",
+      "bars": 16,
+      "prompt": "sparse calm outro, fading orchestral strings, soft sub bass, distant synth pads and light percussion echoes, A minor, 128 BPM, gentle resolution and release",
+      "energy": 0.15,
+      "continuation": true
+    }
+  ],
+  "audio": {
+    "sample_rate": 44100,
+    "channels": "stereo",
+    "crossfade_s": 1.5,
+    "normalize": true
+  },
+  "vocals": {
+    "enabled": false,
+    "engine": "bark",
+    "voice": "v2/en_speaker_6",
+    "lyrics": {}
+  }
+}

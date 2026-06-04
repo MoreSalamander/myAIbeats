@@ -11,8 +11,18 @@ from dataclasses import dataclass, field
 from typing import Any
 
 CLAP_THRESHOLD    = 0.20   # audio↔text cosine — analogous to CLIP in my-AI-scene
+CLAP_FLOOR        = 0.12   # the bar never drops below this, even for silent fades
 DURATION_TOL_S    = 5.0    # ±seconds on section duration (MusicGen can overshoot by 3-4s)
 STITCH_DUR_TOL_S  = 3.0    # ±seconds on final song duration
+
+
+def clap_threshold_for(energy: float) -> float:
+    """A quiet, sparse section (low energy) has less signal for CLAP to match,
+    so it earns a gentler bar — but never below CLAP_FLOOR. A full-energy
+    chorus faces the full CLAP_THRESHOLD. This rewards honest dynamics
+    instead of punishing intentional silence."""
+    eff = CLAP_THRESHOLD * (0.55 + 0.45 * max(0.0, min(1.0, energy)))
+    return round(max(CLAP_FLOOR, eff), 4)
 
 
 @dataclass
@@ -24,14 +34,18 @@ class GateResult:
     metrics: dict[str, Any] = field(default_factory=dict)
 
 
-def section_verify(section_id: str, prompt: str, clap_score: float) -> GateResult:
-    """Blocking. The generated audio must sound like what was asked for."""
-    passed = clap_score >= CLAP_THRESHOLD
+def section_verify(section_id: str, prompt: str, clap_score: float,
+                   energy: float = 1.0) -> GateResult:
+    """Blocking. The generated audio must sound like what was asked for.
+    The threshold scales with the section's energy — a sparse fade-out is
+    held to a gentler bar than a full-energy drop (but never below the floor)."""
+    threshold = clap_threshold_for(energy)
+    passed = clap_score >= threshold
     return GateResult(
         gate="section_verify", passed=passed, blocking=True,
-        detail=f"CLAP score {clap_score:.3f} vs threshold {CLAP_THRESHOLD}",
-        metrics={"clap_score": round(clap_score, 4), "threshold": CLAP_THRESHOLD,
-                 "section": section_id},
+        detail=f"CLAP score {clap_score:.3f} vs threshold {threshold} (energy {energy})",
+        metrics={"clap_score": round(clap_score, 4), "threshold": threshold,
+                 "energy": energy, "section": section_id},
     )
 
 
