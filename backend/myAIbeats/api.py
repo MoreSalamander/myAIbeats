@@ -27,6 +27,11 @@ OUT_DIR      = Path(__file__).resolve().parent.parent.parent / "out"
 app = FastAPI(title="my-AI-beats",
               description="A MoreSalamander StudioLabs production. SongSpec in, song out.")
 
+# Single-flight guard: MusicGen runs on the one MPS device. Two concurrent
+# generations contend and DEADLOCK the device (0% CPU hang, unrecoverable
+# without a kill). Only one render may be in flight at a time.
+_GEN_LOCK = threading.Lock()
+
 
 class GenerateRequest(BaseModel):
     spec_name: str
@@ -44,6 +49,22 @@ QUALITY_MODELS = {
 # ---- streaming generate -------------------------------------------------
 
 def _ndjson_generate(req: GenerateRequest) -> Iterator[str]:
+    # Reject a second render while one is already running — prevents the
+    # MPS device deadlock that comes from two concurrent MusicGen runs.
+    if not _GEN_LOCK.acquire(blocking=False):
+        yield json.dumps({"event": "error", "stage": "server",
+                          "message": "A render is already in progress. "
+                          "Wait for it to finish before starting another — "
+                          "two MusicGen runs would deadlock the MPS device."}) + "\n"
+        return
+
+    try:
+        yield from _generate_locked(req)
+    finally:
+        _GEN_LOCK.release()
+
+
+def _generate_locked(req: GenerateRequest) -> Iterator[str]:
     spec_path = SPECS_DIR / f"{req.spec_name}.json"
     if not spec_path.exists():
         yield json.dumps({"event": "error", "stage": "server",
