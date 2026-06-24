@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>my-AI-beats — a verification-gated local music generator</title>
+<meta name="description" content="A SongSpec becomes a full song: local MusicGen renders each section with audio continuation, a CLAP gate scores each against its intended vibe, and ffmpeg stitches the survivors into one track. Local-first, verified." />
+<style>
+  :root {
+    --bg:#0e0810; --panel:#190f1b; --line:#2e2030; --ink:#f3e6f0; --dim:#a98fa3;
+    --accent:#ec4899; --accent2:#f472b6; --green:#5bbf8f; --red:#e0556b;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace; --sans:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.65;-webkit-font-smoothing:antialiased;}
+  a{color:var(--accent);text-decoration:none;} a:hover{text-decoration:underline;}
+  .wrap{max-width:840px;margin:0 auto;padding:0 22px 110px;}
+  header{padding:80px 0 36px;border-bottom:1px solid var(--line);background:radial-gradient(120% 80% at 50% -10%,rgba(236,72,153,.10),transparent 60%);}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:14px;}
+  h1{font-size:46px;line-height:1.05;margin:0 0 16px;letter-spacing:-1px;font-weight:800;}
+  .lede{font-size:19px;color:var(--dim);max-width:680px;} .lede strong{color:var(--ink);font-weight:600;}
+  .tagline{font-family:var(--mono);color:var(--accent);font-size:14px;letter-spacing:1px;margin-top:20px;}
+  h2{font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin:58px 0 6px;}
+  .h2sub{font-size:25px;font-weight:700;margin:0 0 16px;letter-spacing:-.5px;}
+  p{margin:0 0 16px;} .muted{color:var(--dim);} em{color:var(--ink);font-style:normal;border-bottom:1px dashed var(--dim);}
+  .callout{border-left:3px solid var(--accent);background:rgba(236,72,153,.07);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0;font-size:16px;} .callout strong{color:var(--ink);}
+  .flow{font-family:var(--mono);font-size:13px;color:var(--dim);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:20px 0;overflow-x:auto;} .flow b{color:var(--accent);}
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:18px 0;}
+  ol.steps li{position:relative;padding:12px 0 12px 46px;border-top:1px solid var(--line);} ol.steps li:first-child{border-top:none;}
+  ol.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:12px;font-family:var(--mono);font-size:13px;color:var(--accent);border:1px solid var(--line);border-radius:8px;width:30px;height:30px;display:grid;place-items:center;} ol.steps b{color:var(--ink);}
+  footer{margin-top:58px;padding-top:24px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--dim);}
+  @media(max-width:640px){h1{font-size:34px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="kicker">A MoreSalamander · StudioLabs production</div>
+  <h1>my-AI-beats</h1>
+  <p class="lede">A <strong>local music generator</strong>. A SongSpec becomes a full song — local MusicGen
+  renders each section, a <strong>CLAP gate</strong> scores each against its intended vibe, and ffmpeg
+  stitches the survivors into one track. No cloud, no API keys.</p>
+  <div class="tagline">A spec in, a song out — and the gate has ears.</div>
+</header>
+
+<h2>What it does</h2>
+<div class="h2sub">Sectioned, continued, scored, stitched.</div>
+<p>You author a <em>SongSpec</em> — sections, style, mix, optional vocals — validated by <code>spec.py</code>
+before a note is rendered (a structural failure is an authoring bug, never a model failure). Then the
+pipeline generates the song section by section and keeps only what actually sounds like what you asked for.</p>
+<div class="flow">
+  SongSpec &nbsp;<b>→</b>&nbsp; MusicGen sections (w/ continuation) &nbsp;<b>→</b>&nbsp; CLAP gate scores each &nbsp;<b>→</b>&nbsp; ffmpeg stitch &nbsp;<b>→</b>&nbsp; song.wav
+</div>
+<div class="callout">
+  <strong>The hidden gem: audio continuation.</strong> Each section is generated as a continuation of the
+  last, so the song flows as one piece instead of a playlist of disconnected clips — then a CLAP model
+  judges each section against its prompt, the deterministic ear that keeps a wandering generation honest.
+</div>
+
+<h2>How it works</h2>
+<div class="h2sub">The model proposes audio; a model-free contract and a CLAP gate dispose.</div>
+<ol class="steps">
+  <li><b>Validate the spec.</b> <code>spec.py</code> checks the SongSpec is complete and renderable before anything runs.</li>
+  <li><b>Render sections.</b> MusicGen generates each section, continuing the previous one for coherence.</li>
+  <li><b>Score with CLAP.</b> Each section is scored against its intended vibe; the ones that miss are flagged or regenerated.</li>
+  <li><b>Stitch.</b> ffmpeg assembles the kept sections into one continuous <code>song.wav</code>.</li>
+</ol>
+<p class="muted">First full render: <em>Something Blue</em> — 3:48, sectioned, continued, gated, stitched.</p>
+
+<footer>
+  my-AI-beats — a MoreSalamander · StudioLabs production. &nbsp;|&nbsp;
+  <a href="https://moresalamander.github.io">The studio ↗</a> &nbsp;·&nbsp;
+  <a href="https://github.com/MoreSalamander/myAIbeats">GitHub ↗</a>
+  <br>Local music, verified section by section.
+</footer>
+</div>
+</body>
+</html>
