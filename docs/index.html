@@ -3,76 +3,153 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>my-AI-beats — a verification-gated local music generator</title>
-<meta name="description" content="A SongSpec becomes a full song: local MusicGen renders each section with audio continuation, a CLAP gate scores each against its intended vibe, and ffmpeg stitches the survivors into one track. Local-first, verified." />
+<title>my-AI-beats — a SongSpec becomes a verification-gated song</title>
+<meta name="description" content="A local music generator. A SongSpec becomes a full song: MusicGen renders each section conditioned on the last, a CLAP gate scores each against its intended vibe, and ffmpeg stitches the survivors. Watch the CLAP gate reject and retry." />
 <style>
   :root {
     --bg:#0e0810; --panel:#190f1b; --line:#2e2030; --ink:#f3e6f0; --dim:#a98fa3;
-    --accent:#ec4899; --accent2:#f472b6; --green:#5bbf8f; --red:#e0556b;
+    --accent:#ec4899; --amber:#fbbf24; --blue:#38bdf8; --red:#e0556b; --ok:#5bbf8f;
     --mono:ui-monospace,SFMono-Regular,Menlo,monospace; --sans:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   }
   *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.65;-webkit-font-smoothing:antialiased;}
   a{color:var(--accent);text-decoration:none;} a:hover{text-decoration:underline;}
-  .wrap{max-width:840px;margin:0 auto;padding:0 22px 110px;}
-  header{padding:80px 0 36px;border-bottom:1px solid var(--line);background:radial-gradient(120% 80% at 50% -10%,rgba(236,72,153,.10),transparent 60%);}
+  .wrap{max-width:880px;margin:0 auto;padding:0 22px 110px;}
+  header{padding:74px 0 34px;border-bottom:1px solid var(--line);background:radial-gradient(120% 80% at 50% -10%,rgba(236,72,153,.10),transparent 60%);}
+  .back{font-family:var(--mono);font-size:12px;color:var(--dim);text-decoration:none;display:inline-block;margin-bottom:16px;}
   .kicker{font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:14px;}
-  h1{font-size:46px;line-height:1.05;margin:0 0 16px;letter-spacing:-1px;font-weight:800;}
+  h1{font-size:48px;line-height:1.04;margin:0 0 16px;letter-spacing:-1px;font-weight:800;}
   .lede{font-size:19px;color:var(--dim);max-width:680px;} .lede strong{color:var(--ink);font-weight:600;}
   .tagline{font-family:var(--mono);color:var(--accent);font-size:14px;letter-spacing:1px;margin-top:20px;}
-  h2{font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin:58px 0 6px;}
+  h2{font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin:60px 0 6px;}
   .h2sub{font-size:25px;font-weight:700;margin:0 0 16px;letter-spacing:-.5px;}
   p{margin:0 0 16px;} .muted{color:var(--dim);} em{color:var(--ink);font-style:normal;border-bottom:1px dashed var(--dim);}
+  code{font-family:var(--mono);font-size:.9em;color:var(--amber);}
+  .runner{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 22px 20px;margin:22px 0;}
+  .runbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+  .runbar .t{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);}
+  .attempt{font-family:var(--mono);font-size:12px;color:var(--dim);} .attempt b{color:var(--accent);}
+  .track{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;}
+  .stage{flex:1;min-width:84px;border:1px solid var(--line);border-radius:10px;background:#150c17;padding:11px 8px;text-align:center;transition:all .3s ease;}
+  .stage .sn{font-family:var(--mono);font-size:11px;color:var(--dim);transition:color .3s;}
+  .stage .sg{font-size:10px;font-family:var(--mono);color:#5a4055;margin-top:3px;height:13px;}
+  .stage.active{border-color:var(--accent);background:rgba(236,72,153,.10);box-shadow:0 0 22px -6px var(--accent);}
+  .stage.active .sn{color:var(--ink);}
+  .stage.pass{border-color:var(--ok);} .stage.pass .sg{color:var(--ok);}
+  .stage.fail{border-color:var(--red);background:rgba(224,85,107,.10);} .stage.fail .sg{color:var(--red);} .stage.fail .sn{color:#f4b9c4;}
+  .stage.drop{opacity:.5;border-style:dashed;} .stage.drop .sg{color:var(--amber);}
+  .arrow{display:flex;align-items:center;color:#46303f;font-size:15px;padding:0 4px;}
+  .console{margin-top:16px;background:#0a0509;border:1px solid var(--line);border-radius:10px;padding:13px 15px;font-family:var(--mono);font-size:12px;line-height:1.85;height:150px;overflow:hidden;}
+  .console .ln{white-space:nowrap;} .console .ev{color:var(--dim);} .console .k{color:var(--blue);}
+  .console .pass{color:var(--ok);} .console .fail{color:var(--red);} .console .done{color:var(--amber);}
+  .scorebar{display:flex;align-items:center;gap:12px;margin-top:14px;font-family:var(--mono);font-size:12px;}
+  .meter{flex:1;height:8px;background:#150c17;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .meter .fill{height:100%;width:0;background:var(--red);transition:width .6s ease,background .4s;}
+  .scoreval{min-width:120px;text-align:right;color:var(--dim);} .scoreval b{font-size:14px;}
+  .caption{font-size:12.5px;color:var(--dim);margin-top:14px;line-height:1.5;}
+  .moves{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:22px 0;}
+  .move{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;}
+  .move .num{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px;font-weight:700;}
+  .move.e .num{color:var(--amber);} .move.s .num{color:var(--accent);} .move.v .num{color:var(--ok);}
+  .move p{font-size:13.5px;color:var(--dim);margin:0;line-height:1.55;} .move p b{color:var(--ink);font-weight:600;}
   .callout{border-left:3px solid var(--accent);background:rgba(236,72,153,.07);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0;font-size:16px;} .callout strong{color:var(--ink);}
-  .flow{font-family:var(--mono);font-size:13px;color:var(--dim);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:20px 0;overflow-x:auto;} .flow b{color:var(--accent);}
-  ol.steps{counter-reset:s;list-style:none;padding:0;margin:18px 0;}
-  ol.steps li{position:relative;padding:12px 0 12px 46px;border-top:1px solid var(--line);} ol.steps li:first-child{border-top:none;}
-  ol.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:12px;font-family:var(--mono);font-size:13px;color:var(--accent);border:1px solid var(--line);border-radius:8px;width:30px;height:30px;display:grid;place-items:center;} ol.steps b{color:var(--ink);}
   footer{margin-top:58px;padding-top:24px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--dim);}
-  @media(max-width:640px){h1{font-size:34px;}}
+  @media(max-width:640px){h1{font-size:34px;} .moves{grid-template-columns:1fr;} .arrow{display:none;} .stage{min-width:44%;}}
 </style>
 </head>
 <body>
 <div class="wrap">
+
 <header>
-  <a href="https://moresalamander.github.io" style="font-family:var(--mono);font-size:12px;color:var(--dim);text-decoration:none;display:inline-block;margin-bottom:16px">&larr; the studio</a>
+  <a class="back" href="https://moresalamander.github.io">&larr; the studio</a>
   <div class="kicker">A MoreSalamander · StudioLabs production</div>
   <h1>my-AI-beats</h1>
-  <p class="lede">A <strong>local music generator</strong>. A SongSpec becomes a full song — local MusicGen
-  renders each section, a <strong>CLAP gate</strong> scores each against its intended vibe, and ffmpeg
-  stitches the survivors into one track. No cloud, no API keys.</p>
+  <p class="lede">A <strong>local music generator</strong>. A <code>SongSpec</code> becomes a full song —
+  MusicGen renders each section, a <strong>CLAP gate scores each against its intended vibe</strong>, and
+  ffmpeg stitches the survivors into one track. No cloud, no API keys.</p>
   <div class="tagline">A spec in, a song out — and the gate has ears.</div>
 </header>
 
-<h2>What it does</h2>
+<h2>What it is</h2>
 <div class="h2sub">Sectioned, continued, scored, stitched.</div>
-<p>You author a <em>SongSpec</em> — sections, style, mix, optional vocals — validated by <code>spec.py</code>
-before a note is rendered (a structural failure is an authoring bug, never a model failure). Then the
-pipeline generates the song section by section and keeps only what actually sounds like what you asked for.</p>
-<div class="flow">
-  SongSpec &nbsp;<b>→</b>&nbsp; MusicGen sections (w/ continuation) &nbsp;<b>→</b>&nbsp; CLAP gate scores each &nbsp;<b>→</b>&nbsp; ffmpeg stitch &nbsp;<b>→</b>&nbsp; song.wav
-</div>
-<div class="callout">
-  <strong>The hidden gem: audio continuation.</strong> Each section is generated as a continuation of the
-  last, so the song flows as one piece instead of a playlist of disconnected clips — then a CLAP model
-  judges each section against its prompt, the deterministic ear that keeps a wandering generation honest.
+<p>You author a <code>SongSpec</code> — sections, style, mix, optional vocals — validated by
+<code>spec.py</code> before a note renders (a structural failure is an authoring bug, never a model
+failure). Then the pipeline generates the song section by section and keeps only what actually sounds like
+what you asked for.</p>
+
+<h2>Watch it run</h2>
+<div class="h2sub">A model proposes each section; CLAP decides whether it's the right vibe.</div>
+<div class="runner" id="runner">
+  <div class="runbar"><span class="t">my-AI-beats · live pipeline</span><span class="attempt">attempt <b id="att">1</b></span></div>
+  <div class="track" id="track">
+    <div class="stage" data-s="spec_load"><div class="sn">spec_load</div><div class="sg"></div></div><div class="arrow">→</div>
+    <div class="stage" data-s="section"><div class="sn">section</div><div class="sg">gate ●</div></div><div class="arrow">↝</div>
+    <div class="stage" data-s="continuation"><div class="sn">continuation</div><div class="sg"></div></div><div class="arrow">→</div>
+    <div class="stage" data-s="vocal"><div class="sn">vocal</div><div class="sg">gate ○</div></div><div class="arrow">→</div>
+    <div class="stage" data-s="stitch"><div class="sn">stitch</div><div class="sg">gate ●</div></div><div class="arrow">→</div>
+    <div class="stage" data-s="song"><div class="sn">song.wav</div><div class="sg"></div></div>
+  </div>
+  <div class="scorebar"><span>CLAP</span><div class="meter"><div class="fill" id="fill"></div></div><span class="scoreval" id="sv">— /100 · need ≥ 75</span></div>
+  <div class="console" id="console"></div>
+  <div class="caption">Per section. <strong>The hidden gem ↝</strong>: each section is conditioned on the tail
+  of the previous one, so the song flows. <strong>Blocking ●</strong>: CLAP scores audio against the section
+  prompt; ffprobe verifies the master. <strong>Non-blocking ○</strong>: a failed Bark vocal is dropped — the
+  instrumental ships.</div>
 </div>
 
-<h2>How it works</h2>
-<div class="h2sub">The model proposes audio; a model-free contract and a CLAP gate dispose.</div>
-<ol class="steps">
-  <li><b>Validate the spec.</b> <code>spec.py</code> checks the SongSpec is complete and renderable before anything runs.</li>
-  <li><b>Render sections.</b> MusicGen generates each section, continuing the previous one for coherence.</li>
-  <li><b>Score with CLAP.</b> Each section is scored against its intended vibe; the ones that miss are flagged or regenerated.</li>
-  <li><b>Stitch.</b> ffmpeg assembles the kept sections into one continuous <code>song.wav</code>.</li>
-</ol>
-<p class="muted">First full render: <em>Something Blue</em> — 3:48, sectioned, continued, gated, stitched.</p>
+<h2>The three moves</h2>
+<div class="h2sub">Explain · Synthesize · Verify — section by section.</div>
+<div class="moves">
+  <div class="move e"><div class="num">01 · Explain</div><p>The <b>SongSpec</b> — sections, style, mix, energy arc — is validated by <code>spec.py</code> before a note renders. A structural failure is an authoring bug, caught before any model runs.</p></div>
+  <div class="move s"><div class="num">02 · Synthesize</div><p>MusicGen renders each section <b>conditioned on the tail of the previous one</b> — the hidden gem — so the song flows as one piece instead of a playlist of disconnected clips.</p></div>
+  <div class="move v"><div class="num">03 · Verify</div><p>A <b>CLAP model scores each section against its prompt</b>; duration must match the bar count; ffprobe verifies the master. Vocals are non-blocking — a bad take is dropped, never corrupts the song.</p></div>
+</div>
+
+<h2>Best at — and the honest limit</h2>
+<div class="h2sub">A coherent track, kept honest by a model with ears.</div>
+<p>First full render: <em>Something Blue</em> — 3:48, sectioned, continued, gated, stitched. Every kept
+section cleared CLAP; a wandering generation gets caught and re-rolled instead of shipped.</p>
+<div class="callout"><strong>What it can't do:</strong> CLAP checks that a section <em>matches its prompt's
+vibe</em> — not that the song is <em>good</em>. It guarantees the music is on-brief, and is honest that
+"is this a great song" is a human ear's call.</div>
 
 <footer>
   my-AI-beats — a MoreSalamander · StudioLabs production. &nbsp;|&nbsp;
   <a href="https://moresalamander.github.io">The studio ↗</a> &nbsp;·&nbsp;
+  <a href="https://moresalamander.github.io/projects.html">All projects ↗</a> &nbsp;·&nbsp;
   <a href="https://github.com/MoreSalamander/myAIbeats">GitHub ↗</a>
   <br>Local music, verified section by section.
 </footer>
 </div>
+
+<script>
+(function(){
+  const stages=[...document.querySelectorAll('.stage')], byId=id=>stages.find(s=>s.dataset.s===id);
+  const con=document.getElementById('console'),fill=document.getElementById('fill'),sv=document.getElementById('sv'),att=document.getElementById('att');
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const F=reduced?0.12:1;
+  function clear(){stages.forEach(s=>s.classList.remove('active','pass','fail','drop'));}
+  function log(t,c){const l=document.createElement('div');l.className='ln';l.innerHTML='<span class="ev">'+t+'</span>';if(c)l.querySelector('.ev').className=c;con.appendChild(l);while(con.children.length>7)con.removeChild(con.firstChild);}
+  function score(v,ok){fill.style.width=Math.min(v,100)+'%';fill.style.background=ok?'var(--ok)':'var(--red)';sv.innerHTML='<b style="color:'+(ok?'var(--ok)':'var(--red)')+'">'+v+'</b> /100 · need ≥ 75';}
+  async function run(id,note){clear();byId(id).classList.add('active');log('<span class="k">step_start</span> '+id);await sleep(560*F);if(note)log('<span class="k">'+note+'</span>');log('<span class="k">step_complete</span> '+id);await sleep(340*F);}
+  async function gate(id,ok,note){clear();const el=byId(id);el.classList.add('active');log('<span class="k">gate_check</span> '+id);await sleep(640*F);el.classList.remove('active');el.classList.add(ok?'pass':'fail');el.querySelector('.sg').textContent=ok?'pass ✓':'fail ✕';log((ok?'gate_pass ':'gate_fail ')+id+(note?' · '+note:''),ok?'pass':'fail');await sleep(740*F);}
+  async function drop(id,note){clear();const el=byId(id);el.classList.add('drop');el.querySelector('.sg').textContent='dropped ○';log('gate_fail '+id+' · '+note+' → continue','fail');await sleep(740*F);}
+  function reset(n){con.innerHTML='';clear();stages.forEach(s=>{const g=s.querySelector('.sg');const d=s.dataset.s;g.textContent=(d==='section'||d==='stitch')?'gate ●':(d==='vocal'?'gate ○':'');});att.textContent=n;sv.innerHTML='— /100 · need ≥ 75';fill.style.width='0';}
+  async function loop(){while(true){
+    reset(1);await sleep(500*F);
+    await run('spec_load','validate SongSpec');
+    score(62,false);await gate('section',false,'CLAP 0.62 < 0.75');
+    log('retry ↺ re-render section','fail');await sleep(1100*F);
+    reset(2);await sleep(380*F);
+    await run('section','MusicGen re-render');score(89,true);await gate('section',true,'CLAP 0.89');
+    await run('continuation','↝ conditioned on prev tail');
+    await drop('vocal','Bark take failed');
+    await gate('stitch',true,'ffprobe ok');
+    clear();byId('song').classList.add('active','pass');byId('song').querySelector('.sg').textContent='✓ stitched';
+    log('<span class="done">done</span> song.wav');await sleep(3200*F);
+  }}
+  loop();
+})();
+</script>
 </body>
 </html>
